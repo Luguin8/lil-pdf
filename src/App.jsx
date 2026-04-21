@@ -1,7 +1,8 @@
 // src/App.jsx
 import { useState } from "react";
-import { open, save } from "@tauri-apps/plugin-dialog";
-import { invoke } from "@tauri-apps/api/core"; // ¡NUEVO! El puente hacia Rust
+import { open as openDialog, save } from "@tauri-apps/plugin-dialog";
+import { open as openFile } from "@tauri-apps/plugin-opener"; // ¡NUEVO! Plugin para abrir archivos
+import { invoke } from "@tauri-apps/api/core";
 import "./App.css";
 
 function App() {
@@ -14,7 +15,8 @@ function App() {
   // --- LÓGICA DE SELECCIÓN DE ARCHIVOS ---
   const handleSelectFiles = async () => {
     try {
-      const selectedPaths = await open({
+      // Usamos el alias openDialog
+      const selectedPaths = await openDialog({
         multiple: true,
         filters: [{ name: 'Documentos PDF', extensions: ['pdf'] }]
       });
@@ -38,7 +40,8 @@ function App() {
 
   const handleSelectFolder = async () => {
     try {
-      const selectedFolder = await open({
+      // Usamos el alias openDialog
+      const selectedFolder = await openDialog({
         directory: true,
         multiple: false,
       });
@@ -58,7 +61,7 @@ function App() {
     }
   };
 
-  // --- ¡NUEVO! LÓGICA DE EJECUCIÓN REAL (CONECTADA A RUST) ---
+  // --- LÓGICA DE EJECUCIÓN (RUST + APERTURA AUTOMÁTICA) ---
   const handleExecuteTool = async () => {
     if (files.length === 0) return;
 
@@ -66,35 +69,34 @@ function App() {
 
     try {
       if (activeTool === "merge") {
-        // 1. Le preguntamos al usuario DÓNDE quiere guardar el archivo final
         const savePath = await save({
           filters: [{ name: 'Documento PDF', extensions: ['pdf'] }],
-          defaultPath: 'Documento_Unido.pdf' // Nombre por defecto amigable
+          defaultPath: 'Documento_Unido.pdf'
         });
 
-        // Si el usuario cancela la ventana de guardar, detenemos todo
         if (!savePath) {
           setIsProcessing(false);
           return;
         }
 
-        // 2. Extraemos solo las rutas absolutas que Rust necesita
         const filePaths = files.map(f => f.path);
 
-        // 3. ¡Llamamos a Rust! Le pasamos el array de rutas y la ruta final
         const resultado = await invoke("merge_pdfs", {
           filePaths: filePaths,
           outputPath: savePath
         });
 
-        // Si Rust termina con éxito, React recibe el Ok() y avisamos al usuario
+        // ¡NUEVO! Abrimos el archivo generado con el visor predeterminado de Windows
+        await openFile(savePath);
+
+        // Vaciamos la cola de archivos y confirmamos
+        setFiles([]);
         alert("¡Éxito! " + resultado);
-        setFiles([]); // Vaciamos la cola para el próximo trabajo
+
       } else {
         alert("Esta herramienta estará disponible en la próxima actualización.");
       }
     } catch (error) {
-      // Si Rust falla (ej. un PDF corrupto), lanza un Err() y cae aquí en el catch
       console.error("Error desde el backend de Rust:", error);
       alert("Ocurrió un error: " + error);
     } finally {
@@ -320,7 +322,6 @@ function App() {
               </div>
 
               <div className="mt-6 pt-6 border-t border-neutral-800 shrink-0">
-                {/* BOTÓN EJECUTAR REEMPLAZADO */}
                 <button
                   onClick={handleExecuteTool}
                   disabled={isProcessing}
