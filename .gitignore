@@ -22,3 +22,8 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+# Archivos de la aplicacion y actualizaciones LIL-PDF
+updater_key
+updater_key.pub
+GUIA_PRIVADA_CREADOR.md

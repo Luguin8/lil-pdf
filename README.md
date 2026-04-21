@@ -47,31 +47,14 @@ Reemplazo total de los odiosos `alert` imperativos de los OS antiguos por una ca
 
 ---
 
-## 💻 Instalación Local y Desarrollo
+## 📥 Descarga la App
+> LilPDF está compilado de manera portátil sin librerías fantasma de fondo pesando lo mínimo posible. Es de uso libre.
 
-**Requisitos Previos:**
-- Node.js (v18 o superior)
-- Rust (Cargo) actualizado a `1.70+`
-- (Opcional en Windows) Visual Studio C++ Build Tools
+[![Descargar para Windows](https://img.shields.io/badge/Windows-Descargar_Setup_v1.0.1-0078D6?style=for-the-badge&logo=windows&logoColor=white)](https://github.com/lugomartin/lil-pdf/releases/latest)
 
-**Pasos para correr local:**
-```bash
-# 1. Clonar el repositorio y entrar a la capeta
-git clone https://github.com/lugomartin/lil-pdf.git
-cd lil-pdf
-
-# 2. Instalar dependencias del ecosistema frontend
-npm install
-
-# 3. Levantar entorno dev (El CLI construirá dinámicamente el Webview y compilará el Rust)
-npm run tauri dev
-```
-
-**Generar Binario para Producción 📦**
-```bash
-# Genera el ejecutable (.exe / .msi / .dmg / .AppImage) instalable empaquetado ultra liviano.
-npm run tauri build
-```
+1. Clickea sobre el botón o dirígete a la pestaña **[Releases](https://github.com/lugomartin/lil-pdf/releases)**.
+2. Descarga el instalador `.exe` o `Setup`.
+3. ¡Disfruta! Recibirás notificaciones si libero actualizaciones nuevas directamente desde la interfaz.
 
 ---
 
