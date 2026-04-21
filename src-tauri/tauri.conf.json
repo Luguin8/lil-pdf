@@ -12,9 +12,10 @@
   "app": {
     "windows": [
       {
-        "title": "lil-pdf",
-        "width": 800,
-        "height": 600
+        "title": "LIL-PDF",
+        "width": 1100,
+        "height": 700,
+        "dragDropEnabled": true
       }
     ],
     "security": {

@@ -1,10 +1,555 @@
 @import "tailwindcss";
 
+/* ============================================================
+   LIL-PDF — Global Styles & Animations (CSS puro, sin plugins)
+   ============================================================ */
+
 body {
   background-color: #171717;
-  /* neutral-900 */
   color: #e5e5e5;
-  /* neutral-200 */
   margin: 0;
   font-family: system-ui, -apple-system, sans-serif;
+  overflow: hidden;
+  user-select: none;
+}
+
+/* ---- Custom Scrollbar ---- */
+::-webkit-scrollbar {
+  width: 6px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: #404040;
+  border-radius: 999px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #525252;
+}
+
+/* ============================================================
+   KEYFRAME ANIMATIONS
+   ============================================================ */
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes fadeOut {
+  from { opacity: 1; }
+  to { opacity: 0; }
+}
+
+@keyframes slideUp {
+  from { opacity: 0; transform: translateY(16px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes slideDown {
+  from { opacity: 0; transform: translateY(-8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes scaleIn {
+  from { opacity: 0; transform: scale(0.95); }
+  to { opacity: 1; transform: scale(1); }
+}
+
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+@keyframes bounceSubtle {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-8px); }
+}
+
+@keyframes shimmer {
+  0% { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+
+/* ---- Utility animation classes ---- */
+.anim-fade-in {
+  animation: fadeIn 0.3s ease-out forwards;
+}
+
+.anim-slide-up {
+  animation: slideUp 0.4s ease-out forwards;
+}
+
+.anim-slide-down {
+  animation: slideDown 0.3s ease-out forwards;
+}
+
+.anim-scale-in {
+  animation: scaleIn 0.3s ease-out forwards;
+}
+
+.anim-spin {
+  animation: spin 1s linear infinite;
+}
+
+.anim-bounce {
+  animation: bounceSubtle 1.5s ease-in-out infinite;
+}
+
+/* ============================================================
+   TOAST NOTIFICATIONS
+   ============================================================ */
+
+.toast-container {
+  position: fixed;
+  bottom: 24px;
+  right: 24px;
+  z-index: 9999;
+  display: flex;
+  flex-direction: column-reverse;
+  gap: 8px;
+  pointer-events: none;
+}
+
+.toast {
+  pointer-events: auto;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 18px;
+  border-radius: 14px;
+  font-size: 13px;
+  font-weight: 500;
+  max-width: 380px;
+  line-height: 1.4;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+  animation: slideUp 0.35s ease-out forwards;
+  backdrop-filter: blur(12px);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.toast-exit {
+  animation: fadeOut 0.3s ease-in forwards;
+}
+
+.toast-success {
+  background: rgba(22, 101, 52, 0.85);
+  color: #bbf7d0;
+}
+
+.toast-error {
+  background: rgba(127, 29, 29, 0.85);
+  color: #fecaca;
+}
+
+.toast-info {
+  background: rgba(30, 58, 138, 0.85);
+  color: #bfdbfe;
+}
+
+.toast-icon {
+  flex-shrink: 0;
+  width: 18px;
+  height: 18px;
+}
+
+/* ============================================================
+   MODAL OVERLAY (Page Preview)
+   ============================================================ */
+
+.modal-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  background: rgba(0, 0, 0, 0.85);
+  backdrop-filter: blur(8px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  animation: fadeIn 0.25s ease-out forwards;
+}
+
+.modal-content {
+  position: relative;
+  max-width: 90vw;
+  max-height: 88vh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  animation: scaleIn 0.3s ease-out forwards;
+}
+
+.modal-image {
+  max-width: 100%;
+  max-height: 78vh;
+  object-fit: contain;
+  border-radius: 12px;
+  box-shadow: 0 24px 64px rgba(0, 0, 0, 0.5);
+}
+
+.modal-nav-btn {
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 48px;
+  height: 48px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.1);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  color: white;
+  cursor: pointer;
+  transition: all 0.2s;
+  backdrop-filter: blur(4px);
+}
+.modal-nav-btn:hover {
+  background: rgba(255, 255, 255, 0.2);
+}
+.modal-nav-btn:disabled {
+  opacity: 0.3;
+  cursor: not-allowed;
+}
+.modal-nav-btn.left {
+  left: -64px;
+}
+.modal-nav-btn.right {
+  right: -64px;
+}
+
+.modal-close-btn {
+  position: absolute;
+  top: -48px;
+  right: 0;
+  width: 36px;
+  height: 36px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.1);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  color: white;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+.modal-close-btn:hover {
+  background: rgba(239, 68, 68, 0.5);
+}
+
+.modal-page-indicator {
+  margin-top: 16px;
+  font-size: 14px;
+  color: #a3a3a3;
+  font-weight: 500;
+}
+
+/* ============================================================
+   DRAG & DROP OVERLAY
+   ============================================================ */
+
+.drag-overlay {
+  position: absolute;
+  inset: 0;
+  z-index: 50;
+  background: rgba(23, 23, 23, 0.92);
+  backdrop-filter: blur(6px);
+  border: 3px dashed rgba(255, 255, 255, 0.35);
+  border-radius: 16px;
+  margin: 16px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  animation: fadeIn 0.2s ease-out forwards;
+}
+
+.drag-overlay-icon {
+  width: 80px;
+  height: 80px;
+  color: white;
+  margin-bottom: 16px;
+  animation: bounceSubtle 1.2s ease-in-out infinite;
+}
+
+/* ============================================================
+   THUMBNAIL GRID (Organize Tool)
+   ============================================================ */
+
+.thumbnail-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+  gap: 12px;
+  padding: 4px;
+}
+
+.thumbnail-card {
+  position: relative;
+  border-radius: 12px;
+  overflow: hidden;
+  background: #262626;
+  border: 2px solid transparent;
+  cursor: grab;
+  transition: all 0.2s ease;
+  animation: scaleIn 0.3s ease-out forwards;
+}
+.thumbnail-card:hover {
+  border-color: #525252;
+  transform: translateY(-2px);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.3);
+}
+.thumbnail-card.dragging {
+  opacity: 0.4;
+  border-color: #3b82f6;
+}
+.thumbnail-card.drag-over {
+  border-color: #3b82f6;
+  background: #1e3a5f;
+}
+.thumbnail-card.deleted {
+  opacity: 0.35;
+  filter: grayscale(0.8);
+}
+.thumbnail-card.deleted::after {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 10%;
+  right: 10%;
+  height: 2px;
+  background: #ef4444;
+  transform: rotate(-12deg);
+}
+
+.thumbnail-img {
+  width: 100%;
+  aspect-ratio: 0.71; /* aprox A4 portrait */
+  object-fit: cover;
+  background: #1a1a1a;
+  display: block;
+}
+
+.thumbnail-actions {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  display: flex;
+  gap: 4px;
+  opacity: 0;
+  transition: opacity 0.15s;
+}
+.thumbnail-card:hover .thumbnail-actions {
+  opacity: 1;
+}
+
+.thumbnail-action-btn {
+  width: 28px;
+  height: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 8px;
+  background: rgba(0, 0, 0, 0.7);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  color: #d4d4d4;
+  cursor: pointer;
+  transition: all 0.15s;
+  backdrop-filter: blur(4px);
+}
+.thumbnail-action-btn:hover {
+  background: rgba(0, 0, 0, 0.9);
+  color: white;
+}
+.thumbnail-action-btn.delete:hover {
+  background: rgba(239, 68, 68, 0.8);
+}
+
+.thumbnail-footer {
+  padding: 6px 8px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 11px;
+  color: #a3a3a3;
+  font-weight: 600;
+}
+
+.thumbnail-rotation-badge {
+  font-size: 9px;
+  padding: 1px 5px;
+  border-radius: 6px;
+  background: #3b82f6;
+  color: white;
+  font-weight: 700;
+}
+
+/* Thumbnail loading skeleton */
+.thumbnail-skeleton {
+  width: 100%;
+  aspect-ratio: 0.71;
+  background: linear-gradient(90deg, #262626 25%, #333 50%, #262626 75%);
+  background-size: 200% 100%;
+  animation: shimmer 1.5s infinite;
+  border-radius: 8px;
+}
+
+/* ============================================================
+   FILE LIST DRAG REORDER
+   ============================================================ */
+
+.file-item {
+  transition: all 0.15s ease;
+}
+.file-item.dragging {
+  opacity: 0.4;
+}
+.file-item.drag-over-above {
+  border-top: 2px solid #3b82f6;
+}
+.file-item.drag-over-below {
+  border-bottom: 2px solid #3b82f6;
+}
+
+.drag-handle {
+  cursor: grab;
+  color: #525252;
+  transition: color 0.15s;
+  padding: 4px;
+  display: flex;
+  align-items: center;
+}
+.drag-handle:hover {
+  color: #a3a3a3;
+}
+.drag-handle:active {
+  cursor: grabbing;
+}
+
+/* ============================================================
+   MODE TOGGLE (Split Tool)
+   ============================================================ */
+
+.mode-toggle {
+  display: flex;
+  background: #262626;
+  border-radius: 12px;
+  padding: 4px;
+  border: 1px solid #333;
+}
+
+.mode-toggle-btn {
+  flex: 1;
+  padding: 10px 16px;
+  border-radius: 10px;
+  font-size: 13px;
+  font-weight: 600;
+  color: #737373;
+  cursor: pointer;
+  transition: all 0.2s;
+  text-align: center;
+  border: none;
+  background: transparent;
+}
+.mode-toggle-btn.active {
+  background: #404040;
+  color: white;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+}
+.mode-toggle-btn:not(.active):hover {
+  color: #a3a3a3;
+}
+
+/* ============================================================
+   ORGANIZE TOOLBAR (undo/redo/save)
+   ============================================================ */
+
+.organize-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 16px;
+  background: #1a1a1a;
+  border: 1px solid #333;
+  border-radius: 14px;
+  margin-bottom: 16px;
+}
+
+.toolbar-btn {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 14px;
+  border-radius: 10px;
+  font-size: 12px;
+  font-weight: 600;
+  border: 1px solid #333;
+  background: #262626;
+  color: #d4d4d4;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+.toolbar-btn:hover:not(:disabled) {
+  background: #333;
+  color: white;
+}
+.toolbar-btn:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+.toolbar-btn.primary {
+  background: white;
+  color: black;
+  border-color: white;
+}
+.toolbar-btn.primary:hover:not(:disabled) {
+  background: #e5e5e5;
+}
+
+.toolbar-separator {
+  width: 1px;
+  height: 24px;
+  background: #333;
+  margin: 0 4px;
+}
+
+.toolbar-info {
+  font-size: 12px;
+  color: #737373;
+  font-weight: 500;
+  margin-left: auto;
+}
+
+/* ============================================================
+   INPUT NUMÉRICO (Split Tool)
+   ============================================================ */
+
+.num-input {
+  width: 80px;
+  padding: 10px 12px;
+  background: #262626;
+  border: 1px solid #404040;
+  border-radius: 10px;
+  color: white;
+  font-size: 16px;
+  font-weight: 600;
+  text-align: center;
+  outline: none;
+  transition: border-color 0.2s;
+}
+.num-input:focus {
+  border-color: #737373;
+}
+.num-input::placeholder {
+  color: #525252;
+}
+/* Quitar flechas del input number */
+.num-input::-webkit-outer-spin-button,
+.num-input::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+.num-input[type=number] {
+  -moz-appearance: textfield;
 }
