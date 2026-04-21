@@ -1,6 +1,7 @@
 // src/App.jsx
 import { useState } from "react";
-import { open } from "@tauri-apps/plugin-dialog";
+import { open, save } from "@tauri-apps/plugin-dialog";
+import { invoke } from "@tauri-apps/api/core"; // ¡NUEVO! El puente hacia Rust
 import "./App.css";
 
 function App() {
@@ -10,47 +11,39 @@ function App() {
   const [files, setFiles] = useState([]);
   const [isProcessing, setIsProcessing] = useState(false);
 
-  // --- NUEVA LÓGICA NATIVA DE TAURI ---
-
+  // --- LÓGICA DE SELECCIÓN DE ARCHIVOS ---
   const handleSelectFiles = async () => {
     try {
-      // Abre el explorador de archivos nativo de Windows
       const selectedPaths = await open({
         multiple: true,
         filters: [{ name: 'Documentos PDF', extensions: ['pdf'] }]
       });
 
       if (Array.isArray(selectedPaths)) {
-        // Tauri nos devuelve un array de rutas absolutas (ej: "C:\Users\Martin\Docs\apunte.pdf")
         const newFiles = selectedPaths.map(path => {
-          // Extraemos el nombre del archivo cortando por las barras de Windows (\) o Mac/Linux (/)
           const fileName = path.split(/[\\/]/).pop();
           return {
             id: Math.random().toString(36).substr(2, 9),
             name: fileName,
-            path: path, // ¡ESTO ES EL ORO QUE RUST NECESITA!
-            size: "Ruta local capturada"
+            path: path,
+            size: "Listo para procesar"
           };
         });
         setFiles(prev => [...prev, ...newFiles]);
       }
     } catch (error) {
-      console.error("Error al abrir diálogo de archivos:", error);
+      console.error("Error al abrir diálogo:", error);
     }
   };
 
   const handleSelectFolder = async () => {
     try {
-      // Abre el selector nativo de carpetas
       const selectedFolder = await open({
         directory: true,
         multiple: false,
       });
 
       if (selectedFolder) {
-        // En una versión más avanzada, aquí le pasaremos la ruta de la carpeta a Rust 
-        // para que Rust lea todos los PDFs adentro muy rápido. 
-        // Por ahora, solo lo mostramos en la lista como un "paquete".
         const folderName = selectedFolder.split(/[\\/]/).pop();
         const newFile = {
           id: Math.random().toString(36).substr(2, 9),
@@ -61,46 +54,55 @@ function App() {
         setFiles(prev => [...prev, newFile]);
       }
     } catch (error) {
-      console.error("Error al abrir diálogo de carpeta:", error);
+      console.error("Error al abrir diálogo:", error);
     }
   };
 
-  // ------------------------------------
+  // --- ¡NUEVO! LÓGICA DE EJECUCIÓN REAL (CONECTADA A RUST) ---
+  const handleExecuteTool = async () => {
+    if (files.length === 0) return;
 
-  const tools = {
-    merge: {
-      title: "Unir PDFs",
-      desc: "Combina múltiples archivos PDF en un solo documento consolidado.",
-      how: "Arrastra todos los archivos que quieras unir. Puedes cargarlos uno por uno o una carpeta completa. Luego, podrás ordenar la secuencia antes de generar el resultado final.",
-      icon: (
-        <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="1.5">
-          <path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
-          <path strokeLinecap="round" strokeLinejoin="round" d="M8.25 6.75h7.5M8.25 17.25h7.5" />
-        </svg>
-      )
-    },
-    split: {
-      title: "Dividir PDF",
-      desc: "Extrae páginas específicas o divide un archivo grande en varios documentos pequeños.",
-      how: "Carga el PDF original y selecciona los rangos de páginas (ej: 1-5, 10-12). Lil-PDF creará nuevos archivos solo con el contenido que necesites.",
-      icon: (
-        <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="1.5">
-          <path strokeLinecap="round" strokeLinejoin="round" d="M10.5 6h9.75M10.5 6a1.5 1.5 0 1 1-3 0m3 0a1.5 1.5 0 1 0-3 0M3.75 6H7.5m3 12h9.75m-9.75 0a1.5 1.5 0 1 1-3 0m3 0a1.5 1.5 0 1 0-3 0m-3.75 0H7.5m9-6h3.75m-3.75 0a1.5 1.5 0 1 1-3 0m3 0a1.5 1.5 0 1 0-3 0m-9.75 0h9.75" />
-        </svg>
-      )
-    },
-    organize: {
-      title: "Organizar Páginas",
-      desc: "Visualiza todas las páginas para reordenar, rotar o eliminar lo que no sirve.",
-      how: "Al cargar tu archivo verás miniaturas. Arrástralas para cambiar el orden, usa las flechas para rotarlas o el ícono de basura para quitar páginas.",
-      icon: (
-        <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="1.5">
-          <path strokeLinecap="round" strokeLinejoin="round" d="M3.75 6A2.25 2.25 0 0 1 6 3.75h2.25A2.25 2.25 0 0 1 10.5 6v2.25a2.25 2.25 0 0 1-2.25 2.25H6a2.25 2.25 0 0 1-2.25-2.25V6ZM3.75 15.75A2.25 2.25 0 0 1 6 13.5h2.25a2.25 2.25 0 0 1 2.25 2.25V18a2.25 2.25 0 0 1-2.25 2.25H6A2.25 2.25 0 0 1 3.75 18v-2.25ZM13.5 6a2.25 2.25 0 0 1 2.25-2.25H18A2.25 2.25 0 0 1 20.25 6v2.25A2.25 2.25 0 0 1 18 10.5h-2.25a2.25 2.25 0 0 1-2.25-2.25V6ZM13.5 15.75a2.25 2.25 0 0 1 2.25-2.25H18a2.25 2.25 0 0 1 2.25 2.25V18A2.25 2.25 0 0 1 18 20.25h-2.25a2.25 2.25 0 0 1-2.25-2.25v-2.25Z" />
-        </svg>
-      )
+    setIsProcessing(true);
+
+    try {
+      if (activeTool === "merge") {
+        // 1. Le preguntamos al usuario DÓNDE quiere guardar el archivo final
+        const savePath = await save({
+          filters: [{ name: 'Documento PDF', extensions: ['pdf'] }],
+          defaultPath: 'Documento_Unido.pdf' // Nombre por defecto amigable
+        });
+
+        // Si el usuario cancela la ventana de guardar, detenemos todo
+        if (!savePath) {
+          setIsProcessing(false);
+          return;
+        }
+
+        // 2. Extraemos solo las rutas absolutas que Rust necesita
+        const filePaths = files.map(f => f.path);
+
+        // 3. ¡Llamamos a Rust! Le pasamos el array de rutas y la ruta final
+        const resultado = await invoke("merge_pdfs", {
+          filePaths: filePaths,
+          outputPath: savePath
+        });
+
+        // Si Rust termina con éxito, React recibe el Ok() y avisamos al usuario
+        alert("¡Éxito! " + resultado);
+        setFiles([]); // Vaciamos la cola para el próximo trabajo
+      } else {
+        alert("Esta herramienta estará disponible en la próxima actualización.");
+      }
+    } catch (error) {
+      // Si Rust falla (ej. un PDF corrupto), lanza un Err() y cae aquí en el catch
+      console.error("Error desde el backend de Rust:", error);
+      alert("Ocurrió un error: " + error);
+    } finally {
+      setIsProcessing(false);
     }
   };
 
+  // --- EVENTOS DRAG & DROP FRONTEND ---
   const handleDragOver = (e) => {
     e.preventDefault();
     setIsDragging(true);
@@ -116,8 +118,6 @@ function App() {
   const handleDrop = (e) => {
     e.preventDefault();
     setIsDragging(false);
-    // Nota: A futuro cambiaremos este Drag&Drop para usar el evento nativo de Tauri 
-    // y obtener las rutas absolutas también al arrastrar.
     const droppedFiles = Array.from(e.dataTransfer.files).filter(file => file.type === "application/pdf" || file.name.endsWith(".pdf"));
 
     const newFiles = droppedFiles.map(f => ({
@@ -134,12 +134,39 @@ function App() {
     setFiles(files.filter(f => f.id !== id));
   };
 
-  const simulateProcess = () => {
-    setIsProcessing(true);
-    setTimeout(() => {
-      setIsProcessing(false);
-      setFiles([]);
-    }, 2000);
+  // --- TEXTOS E ICONOS ---
+  const tools = {
+    merge: {
+      title: "Unir PDFs",
+      desc: "Combina múltiples archivos PDF en un solo documento consolidado.",
+      how: "Carga todos los archivos que quieras unir. El orden en la lista será el orden del documento final.",
+      icon: (
+        <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="1.5">
+          <path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
+          <path strokeLinecap="round" strokeLinejoin="round" d="M8.25 6.75h7.5M8.25 17.25h7.5" />
+        </svg>
+      )
+    },
+    split: {
+      title: "Dividir PDF",
+      desc: "Extrae páginas específicas o divide un archivo grande en varios documentos pequeños.",
+      how: "Próximamente disponible en la fase 2 del desarrollo.",
+      icon: (
+        <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="1.5">
+          <path strokeLinecap="round" strokeLinejoin="round" d="M10.5 6h9.75M10.5 6a1.5 1.5 0 1 1-3 0m3 0a1.5 1.5 0 1 0-3 0M3.75 6H7.5m3 12h9.75m-9.75 0a1.5 1.5 0 1 1-3 0m3 0a1.5 1.5 0 1 0-3 0m-3.75 0H7.5m9-6h3.75m-3.75 0a1.5 1.5 0 1 1-3 0m3 0a1.5 1.5 0 1 0-3 0m-9.75 0h9.75" />
+        </svg>
+      )
+    },
+    organize: {
+      title: "Organizar Páginas",
+      desc: "Visualiza todas las páginas para reordenar, rotar o eliminar lo que no sirve.",
+      how: "Próximamente disponible en la fase 3 del desarrollo.",
+      icon: (
+        <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="1.5">
+          <path strokeLinecap="round" strokeLinejoin="round" d="M3.75 6A2.25 2.25 0 0 1 6 3.75h2.25A2.25 2.25 0 0 1 10.5 6v2.25a2.25 2.25 0 0 1-2.25 2.25H6a2.25 2.25 0 0 1-2.25-2.25V6ZM3.75 15.75A2.25 2.25 0 0 1 6 13.5h2.25a2.25 2.25 0 0 1 2.25 2.25V18a2.25 2.25 0 0 1-2.25 2.25H6A2.25 2.25 0 0 1 3.75 18v-2.25ZM13.5 6a2.25 2.25 0 0 1 2.25-2.25H18A2.25 2.25 0 0 1 20.25 6v2.25A2.25 2.25 0 0 1 18 10.5h-2.25a2.25 2.25 0 0 1-2.25-2.25V6ZM13.5 15.75a2.25 2.25 0 0 1 2.25-2.25H18a2.25 2.25 0 0 1 2.25 2.25V18A2.25 2.25 0 0 1 18 20.25h-2.25a2.25 2.25 0 0 1-2.25-2.25v-2.25Z" />
+        </svg>
+      )
+    }
   };
 
   return (
@@ -237,14 +264,12 @@ function App() {
               </div>
 
               <div className="mt-4 flex gap-3 justify-center z-10">
-                {/* BOTÓN CONECTADO A RUST */}
                 <button
                   onClick={handleSelectFiles}
                   className="bg-white text-black px-6 py-2.5 rounded-xl font-bold hover:bg-neutral-200 transition-all active:scale-95 shadow-lg text-sm"
                 >
                   Seleccionar Archivos
                 </button>
-                {/* BOTÓN PARA CARPETAS */}
                 <button
                   onClick={handleSelectFolder}
                   className="bg-neutral-800 text-white px-6 py-2.5 rounded-xl font-bold hover:bg-neutral-700 transition-all active:scale-95 border border-neutral-700 text-sm"
@@ -261,7 +286,7 @@ function App() {
               <div className="flex justify-between items-center mb-4">
                 <h3 className="text-lg font-bold text-white">Archivos en cola ({files.length})</h3>
                 <button
-                  onClick={handleSelectFiles} // Conectado al plugin también
+                  onClick={handleSelectFiles}
                   className="text-sm font-medium text-neutral-400 hover:text-white transition-colors border border-neutral-700 px-3 py-1.5 rounded-lg hover:bg-neutral-800"
                 >
                   + Agregar más archivos
@@ -279,7 +304,6 @@ function App() {
                       </div>
                       <div className="truncate">
                         <p className="text-sm font-medium text-white truncate">{file.name}</p>
-                        {/* AHORA MOSTRAMOS LA RUTA REAL PARA COMPROBAR QUE FUNCIONA */}
                         <p className="text-xs text-neutral-500 truncate" title={file.path}>{file.path}</p>
                       </div>
                     </div>
@@ -296,8 +320,9 @@ function App() {
               </div>
 
               <div className="mt-6 pt-6 border-t border-neutral-800 shrink-0">
+                {/* BOTÓN EJECUTAR REEMPLAZADO */}
                 <button
-                  onClick={simulateProcess}
+                  onClick={handleExecuteTool}
                   disabled={isProcessing}
                   className={`w-full py-4 rounded-xl font-bold text-lg transition-all flex items-center justify-center gap-3 ${isProcessing
                       ? "bg-neutral-800 text-neutral-500 cursor-not-allowed border border-neutral-700"
