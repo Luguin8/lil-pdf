@@ -44,9 +44,9 @@ export default function OrganizeTool({ droppedPaths, onDroppingHandled }) {
 
   // --- Undo/Redo ---
   const [history, setHistory] = useState([]);
-  const [future, setFuture] = useState([]);
 
   // Drag state for reordering
+  const dragItemRef = useRef(null);
   const [dragIndex, setDragIndex] = useState(null);
   const [dragOverIndex, setDragOverIndex] = useState(null);
 
@@ -64,7 +64,6 @@ export default function OrganizeTool({ droppedPaths, onDroppingHandled }) {
     setThumbnails({});
     setPreviews({});
     setHistory([]);
-    setFuture([]);
 
     try {
       // Obtener page count
@@ -138,23 +137,13 @@ export default function OrganizeTool({ droppedPaths, onDroppingHandled }) {
   // --- Acciones con undo/redo ---
   const saveToHistory = useCallback(() => {
     setHistory((prev) => [...prev, pageState]);
-    setFuture([]);
   }, [pageState]);
 
   const undo = () => {
     if (history.length === 0) return;
     const prev = history[history.length - 1];
-    setFuture((f) => [...f, pageState]);
     setPageState(prev);
     setHistory((h) => h.slice(0, -1));
-  };
-
-  const redo = () => {
-    if (future.length === 0) return;
-    const next = future[future.length - 1];
-    setHistory((h) => [...h, pageState]);
-    setPageState(next);
-    setFuture((f) => f.slice(0, -1));
   };
 
   // Rotar página 90° clockwise
@@ -183,37 +172,50 @@ export default function OrganizeTool({ droppedPaths, onDroppingHandled }) {
     });
   };
 
-  // --- Drag & drop reorder para thumbnails ---
+  // --- Drag & drop reorder BLINDADO ---
   const handleDragStart = (e, index) => {
-    setDragIndex(index);
+    dragItemRef.current = index; // Guardamos en memoria profunda
+    setDragIndex(index); // Guardamos para la UI
     e.dataTransfer.effectAllowed = "move";
-    e.dataTransfer.setData("text/plain", index.toString());
+    e.dataTransfer.setData("text/plain", index.toString()); // OBLIGATORIO para Firefox/Chromium
   };
 
   const handleDragOver = (e, index) => {
-    e.preventDefault();
-    e.dataTransfer.dropEffect = "move";
-    if (dragIndex !== null && index !== dragIndex) {
+    e.preventDefault(); // OBLIGATORIO para permitir que se suelte
+    e.stopPropagation(); // OBLIGATORIO: Evita que Tauri robe el evento
+
+    if (dragItemRef.current !== null && dragItemRef.current !== index) {
       setDragOverIndex(index);
     }
   };
 
   const handleDragEnd = () => {
+    dragItemRef.current = null;
     setDragIndex(null);
     setDragOverIndex(null);
   };
 
   const handleDrop = (e, dropIndex) => {
     e.preventDefault();
-    if (dragIndex === null || dragIndex === dropIndex) {
+    e.stopPropagation(); // OBLIGATORIO: Evita comportamientos raros de Windows
+
+    const startIndex = dragItemRef.current;
+
+    // Si soltamos en el mismo lugar o falló la referencia, no hacemos nada
+    if (startIndex === null || startIndex === dropIndex) {
       handleDragEnd();
       return;
     }
+
     saveToHistory();
-    const newState = [...pageState];
-    const [moved] = newState.splice(dragIndex, 1);
-    newState.splice(dropIndex, 0, moved);
-    setPageState(newState);
+    // Reordenamos el array de manera segura
+    setPageState((prev) => {
+      const newState = [...prev];
+      const [moved] = newState.splice(startIndex, 1);
+      newState.splice(dropIndex, 0, moved);
+      return newState;
+    });
+
     handleDragEnd();
   };
 
@@ -310,13 +312,21 @@ export default function OrganizeTool({ droppedPaths, onDroppingHandled }) {
   };
 
   const handleReset = () => {
+    // FIX DE MEMORIA: Limpia el caché de C++ de pdf.js
+    if (pdfDocRef.current) {
+      try {
+        pdfDocRef.current.destroy();
+      } catch (e) {
+        console.warn("Error destruyendo doc:", e);
+      }
+    }
+
     setFile(null);
     setPageCount(0);
     setPageState([]);
     setThumbnails({});
     setPreviews({});
     setHistory([]);
-    setFuture([]);
     pdfDocRef.current = null;
   };
 
@@ -369,18 +379,6 @@ export default function OrganizeTool({ droppedPaths, onDroppingHandled }) {
             <path strokeLinecap="round" strokeLinejoin="round" d="M9 15L3 9m0 0l6-6M3 9h12a6 6 0 0 1 0 12h-3" />
           </svg>
           Deshacer
-        </button>
-
-        <button
-          className="toolbar-btn"
-          onClick={redo}
-          disabled={future.length === 0}
-          title="Rehacer (Ctrl+Y)"
-        >
-          <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
-            <path strokeLinecap="round" strokeLinejoin="round" d="M15 15l6-6m0 0l-6-6m6 6H9a6 6 0 0 0 0 12h3" />
-          </svg>
-          Rehacer
         </button>
 
         <div className="toolbar-separator" />
@@ -437,19 +435,18 @@ export default function OrganizeTool({ droppedPaths, onDroppingHandled }) {
         <div className="thumbnail-grid">
           {pageState.map((page, index) => (
             <div
-              key={`${page.originalPageNum}-${index}`}
+              // FIX CRÍTICO: Nunca usar el index en la key si vas a reordenar.
+              key={page.originalPageNum}
               draggable="true"
               onDragStart={(e) => handleDragStart(e, index)}
+              onDragEnter={(e) => e.preventDefault()} // FIX CRÍTICO: Permite el drop en Windows
               onDragOver={(e) => handleDragOver(e, index)}
               onDragEnd={handleDragEnd}
               onDrop={(e) => handleDrop(e, index)}
-              className={`thumbnail-card ${
-                dragIndex === index ? "dragging" : ""
-              } ${
-                dragOverIndex === index ? "drag-over" : ""
-              } ${
-                page.deleted ? "deleted" : ""
-              }`}
+              className={`thumbnail-card ${dragIndex === index ? "dragging" : ""
+                } ${dragOverIndex === index ? "drag-over" : ""
+                } ${page.deleted ? "deleted" : ""
+                }`}
             >
               <div className="absolute top-1.5 left-1.5 p-1 bg-black/60 rounded cursor-grab z-10 hover:bg-black/80 text-white backdrop-blur-sm shadow-sm" title="Arrastrar para mover">
                 <svg width="12" height="12" viewBox="0 0 16 16" fill="currentColor">

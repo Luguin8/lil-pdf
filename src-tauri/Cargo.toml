@@ -1,7 +1,7 @@
 [package]
 name = "lil-pdf"
-version = "0.1.0"
-description = "A Tauri App"
+version = "1.0.1"
+description = "Una herramienta de escritorio ultra liviana, rapida y local para la manipulacion avanzada de archivos PDF."
 authors = ["you"]
 edition = "2021"
 
