@@ -2,6 +2,8 @@
 import { useState, useEffect, useCallback } from "react";
 import { getCurrentWebviewWindow } from "@tauri-apps/api/webviewWindow";
 import { ToastProvider } from "./components/Toast";
+import { check } from '@tauri-apps/plugin-updater';
+import { ask, message } from '@tauri-apps/plugin-dialog';
 import MergeTool from "./components/MergeTool";
 import SplitTool from "./components/SplitTool";
 import OrganizeTool from "./components/OrganizeTool";
@@ -80,6 +82,29 @@ function AppContent() {
     return () => {
       if (unlisten) unlisten();
     };
+  }, []);
+
+  useEffect(() => {
+    async function checkForAppUpdates() {
+      try {
+        const update = await check();
+        if (update && update.available) {
+          const yes = await ask(`Se ha detectado una nueva versión de LIL-PDF (${update.version}).\n\n¿Deseas descargarla e instalarla ahora automáticamente?`, {
+            title: 'Actualización Disponible',
+            kind: 'info',
+            okLabel: 'Actualizar',
+            cancelLabel: 'Más tarde'
+          });
+          if (yes) {
+            await update.downloadAndInstall();
+            await message('La actualización se ha instalado correctamente. Por favor, reinicia la aplicación para aplicar los cambios.', { title: 'Actualización Exitosa' });
+          }
+        }
+      } catch (error) {
+        console.error("Error comprobando actualizaciones:", error);
+      }
+    }
+    checkForAppUpdates();
   }, []);
 
   const handleClearDropped = useCallback(() => {

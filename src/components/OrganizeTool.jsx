@@ -45,11 +45,6 @@ export default function OrganizeTool({ droppedPaths, onDroppingHandled }) {
   // --- Undo/Redo ---
   const [history, setHistory] = useState([]);
 
-  // Drag state for reordering
-  const dragItemRef = useRef(null);
-  const [dragIndex, setDragIndex] = useState(null);
-  const [dragOverIndex, setDragOverIndex] = useState(null);
-
   // Procesar archivos soltados desde escritorio
   useEffect(() => {
     if (droppedPaths && droppedPaths.length > 0) {
@@ -172,51 +167,26 @@ export default function OrganizeTool({ droppedPaths, onDroppingHandled }) {
     });
   };
 
-  // --- Drag & drop reorder BLINDADO ---
-  const handleDragStart = (e, index) => {
-    dragItemRef.current = index; // Guardamos en memoria profunda
-    setDragIndex(index); // Guardamos para la UI
-    e.dataTransfer.effectAllowed = "move";
-    e.dataTransfer.setData("text/plain", index.toString()); // OBLIGATORIO para Firefox/Chromium
-  };
 
-  const handleDragOver = (e, index) => {
-    e.preventDefault(); // OBLIGATORIO para permitir que se suelte
-    e.stopPropagation(); // OBLIGATORIO: Evita que Tauri robe el evento
-
-    if (dragItemRef.current !== null && dragItemRef.current !== index) {
-      setDragOverIndex(index);
-    }
-  };
-
-  const handleDragEnd = () => {
-    dragItemRef.current = null;
-    setDragIndex(null);
-    setDragOverIndex(null);
-  };
-
-  const handleDrop = (e, dropIndex) => {
-    e.preventDefault();
-    e.stopPropagation(); // OBLIGATORIO: Evita comportamientos raros de Windows
-
-    const startIndex = dragItemRef.current;
-
-    // Si soltamos en el mismo lugar o falló la referencia, no hacemos nada
-    if (startIndex === null || startIndex === dropIndex) {
-      handleDragEnd();
-      return;
-    }
-
+  // --- Reordenamiento mediante flechas ---
+  const moveBackward = (index) => {
+    if (index === 0) return;
     saveToHistory();
-    // Reordenamos el array de manera segura
     setPageState((prev) => {
-      const newState = [...prev];
-      const [moved] = newState.splice(startIndex, 1);
-      newState.splice(dropIndex, 0, moved);
-      return newState;
+      const arr = [...prev];
+      [arr[index - 1], arr[index]] = [arr[index], arr[index - 1]];
+      return arr;
     });
+  };
 
-    handleDragEnd();
+  const moveForward = (index) => {
+    if (index === pageState.length - 1) return;
+    saveToHistory();
+    setPageState((prev) => {
+      const arr = [...prev];
+      [arr[index], arr[index + 1]] = [arr[index + 1], arr[index]];
+      return arr;
+    });
   };
 
   // --- Abrir modal de preview ---
@@ -427,7 +397,7 @@ export default function OrganizeTool({ droppedPaths, onDroppingHandled }) {
         <svg className="w-3.5 h-3.5 text-neutral-600 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
           <path strokeLinecap="round" strokeLinejoin="round" d="m11.25 11.25.041-.02a.75.75 0 0 1 1.063.852l-.708 2.836a.75.75 0 0 0 1.063.853l.041-.021M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0zm-9-3.75h.008v.008H12V8.25z" />
         </svg>
-        Arrastrá las páginas para reordenarlas. Hacé click para verlas en grande.
+        Utilizá las flechas para reordenarlas. Hacé click para verlas en grande.
       </p>
 
       {/* Grid de thumbnails */}
@@ -437,26 +407,29 @@ export default function OrganizeTool({ droppedPaths, onDroppingHandled }) {
             <div
               // FIX CRÍTICO: Nunca usar el index en la key si vas a reordenar.
               key={page.originalPageNum}
-              draggable="true"
-              onDragStart={(e) => handleDragStart(e, index)}
-              onDragEnter={(e) => e.preventDefault()} // FIX CRÍTICO: Permite el drop en Windows
-              onDragOver={(e) => handleDragOver(e, index)}
-              onDragEnd={handleDragEnd}
-              onDrop={(e) => handleDrop(e, index)}
-              className={`thumbnail-card ${dragIndex === index ? "dragging" : ""
-                } ${dragOverIndex === index ? "drag-over" : ""
-                } ${page.deleted ? "deleted" : ""
-                }`}
+              className={`thumbnail-card ${page.deleted ? "deleted" : ""}`}
             >
-              <div className="absolute top-1.5 left-1.5 p-1 bg-black/60 rounded cursor-grab z-10 hover:bg-black/80 text-white backdrop-blur-sm shadow-sm" title="Arrastrar para mover">
-                <svg width="12" height="12" viewBox="0 0 16 16" fill="currentColor">
-                  <circle cx="5" cy="3" r="1.5" />
-                  <circle cx="11" cy="3" r="1.5" />
-                  <circle cx="5" cy="8" r="1.5" />
-                  <circle cx="11" cy="8" r="1.5" />
-                  <circle cx="5" cy="13" r="1.5" />
-                  <circle cx="11" cy="13" r="1.5" />
-                </svg>
+              <div className="absolute top-1.5 left-1.5 flex gap-1 z-10">
+                <button
+                  className="p-1 bg-black/60 rounded cursor-pointer hover:bg-black/80 text-white backdrop-blur-sm shadow-sm transition disabled:opacity-30 disabled:cursor-not-allowed"
+                  title="Mover Atrás"
+                  onClick={(e) => { e.stopPropagation(); moveBackward(index); }}
+                  disabled={index === 0}
+                >
+                  <svg width="12" height="12" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="3">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 19.5L8.25 12l7.5-7.5" />
+                  </svg>
+                </button>
+                <button
+                  className="p-1 bg-black/60 rounded cursor-pointer hover:bg-black/80 text-white backdrop-blur-sm shadow-sm transition disabled:opacity-30 disabled:cursor-not-allowed"
+                  title="Mover Adelante"
+                  onClick={(e) => { e.stopPropagation(); moveForward(index); }}
+                  disabled={index === pageState.length - 1}
+                >
+                  <svg width="12" height="12" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="3">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M8.25 4.5l7.5 7.5-7.5 7.5" />
+                  </svg>
+                </button>
               </div>
 
               {/* Imagen thumbnail */}

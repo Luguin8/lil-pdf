@@ -55,37 +55,23 @@ export default function MergeTool({ droppedPaths, onDroppingHandled }) {
     setFiles((prev) => prev.filter((f) => f.id !== id));
   };
 
-  // --- Drag-and-drop reorder ---
-  const handleDragStart = (e, index) => {
-    setDragIndex(index);
-    e.dataTransfer.effectAllowed = "move";
-    e.dataTransfer.setData("text/plain", index.toString());
+  // --- Reordenamiento mediante flechas ---
+  const moveUp = (index) => {
+    if (index === 0) return;
+    setFiles((prev) => {
+      const newFiles = [...prev];
+      [newFiles[index - 1], newFiles[index]] = [newFiles[index], newFiles[index - 1]];
+      return newFiles;
+    });
   };
 
-  const handleDragOver = (e, index) => {
-    e.preventDefault();
-    e.dataTransfer.dropEffect = "move";
-    if (dragIndex !== null && index !== dragIndex) {
-      setDragOverIndex(index);
-    }
-  };
-
-  const handleDragEnd = () => {
-    setDragIndex(null);
-    setDragOverIndex(null);
-  };
-
-  const handleDrop = (e, dropIndex) => {
-    e.preventDefault();
-    if (dragIndex === null || dragIndex === dropIndex) {
-      handleDragEnd();
-      return;
-    }
-    const newFiles = [...files];
-    const [moved] = newFiles.splice(dragIndex, 1);
-    newFiles.splice(dropIndex, 0, moved);
-    setFiles(newFiles);
-    handleDragEnd();
+  const moveDown = (index) => {
+    if (index === files.length - 1) return;
+    setFiles((prev) => {
+      const newFiles = [...prev];
+      [newFiles[index], newFiles[index + 1]] = [newFiles[index + 1], newFiles[index]];
+      return newFiles;
+    });
   };
 
   // --- Ejecutar merge ---
@@ -157,30 +143,32 @@ export default function MergeTool({ droppedPaths, onDroppingHandled }) {
         {files.map((file, index) => (
           <div
             key={file.id}
-            draggable
-            onDragStart={(e) => handleDragStart(e, index)}
-            onDragOver={(e) => handleDragOver(e, index)}
-            onDragEnd={handleDragEnd}
-            onDrop={(e) => handleDrop(e, index)}
-            className={`file-item flex items-center justify-between p-3.5 bg-neutral-800/50 border border-neutral-700/50 rounded-xl hover:bg-neutral-800 transition-colors ${
-              dragIndex === index ? "dragging" : ""
-            } ${
-              dragOverIndex === index
-                ? dragIndex < index ? "drag-over-below" : "drag-over-above"
-                : ""
-            }`}
+            className={`file-item flex items-center justify-between p-3.5 bg-neutral-800/50 border border-neutral-700/50 rounded-xl hover:bg-neutral-800 transition-colors`}
           >
             <div className="flex items-center gap-3 overflow-hidden">
-              <div className="drag-handle" title="Arrastrar para reordenar">
-                <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor">
-                  <circle cx="5" cy="3" r="1.5" />
-                  <circle cx="11" cy="3" r="1.5" />
-                  <circle cx="5" cy="8" r="1.5" />
-                  <circle cx="11" cy="8" r="1.5" />
-                  <circle cx="5" cy="13" r="1.5" />
-                  <circle cx="11" cy="13" r="1.5" />
-                </svg>
+              <div className="flex flex-col gap-1 pr-2 border-r border-neutral-700/50">
+                <button
+                  className="text-neutral-500 hover:text-white p-0.5 rounded-sm hover:bg-neutral-700 transition"
+                  onClick={() => moveUp(index)}
+                  disabled={index === 0}
+                  title="Subir"
+                >
+                  <svg width="12" height="12" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="m4.5 15.75 7.5-7.5 7.5 7.5" />
+                  </svg>
+                </button>
+                <button
+                  className="text-neutral-500 hover:text-white p-0.5 rounded-sm hover:bg-neutral-700 transition"
+                  onClick={() => moveDown(index)}
+                  disabled={index === files.length - 1}
+                  title="Bajar"
+                >
+                  <svg width="12" height="12" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="m19.5 8.25-7.5 7.5-7.5-7.5" />
+                  </svg>
+                </button>
               </div>
+
               <div className="p-2 bg-neutral-900 rounded-lg text-red-500 shrink-0">
                 <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
                   <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 0 0-3.375-3.375h-1.5A1.125 1.125 0 0 1 13.5 7.125v-1.5a3.375 3.375 0 0 0-3.375-3.375H8.25m2.25 0H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 0 0-9-9Z" />
