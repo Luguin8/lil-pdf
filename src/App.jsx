@@ -1,14 +1,71 @@
-
+// src/App.jsx
 import { useState } from "react";
+import { open } from "@tauri-apps/plugin-dialog";
 import "./App.css";
 
 function App() {
   const [activeTool, setActiveTool] = useState("merge");
 
-  // Nuevos estados para la lógica de archivos y UI
   const [isDragging, setIsDragging] = useState(false);
   const [files, setFiles] = useState([]);
   const [isProcessing, setIsProcessing] = useState(false);
+
+  // --- NUEVA LÓGICA NATIVA DE TAURI ---
+
+  const handleSelectFiles = async () => {
+    try {
+      // Abre el explorador de archivos nativo de Windows
+      const selectedPaths = await open({
+        multiple: true,
+        filters: [{ name: 'Documentos PDF', extensions: ['pdf'] }]
+      });
+
+      if (Array.isArray(selectedPaths)) {
+        // Tauri nos devuelve un array de rutas absolutas (ej: "C:\Users\Martin\Docs\apunte.pdf")
+        const newFiles = selectedPaths.map(path => {
+          // Extraemos el nombre del archivo cortando por las barras de Windows (\) o Mac/Linux (/)
+          const fileName = path.split(/[\\/]/).pop();
+          return {
+            id: Math.random().toString(36).substr(2, 9),
+            name: fileName,
+            path: path, // ¡ESTO ES EL ORO QUE RUST NECESITA!
+            size: "Ruta local capturada"
+          };
+        });
+        setFiles(prev => [...prev, ...newFiles]);
+      }
+    } catch (error) {
+      console.error("Error al abrir diálogo de archivos:", error);
+    }
+  };
+
+  const handleSelectFolder = async () => {
+    try {
+      // Abre el selector nativo de carpetas
+      const selectedFolder = await open({
+        directory: true,
+        multiple: false,
+      });
+
+      if (selectedFolder) {
+        // En una versión más avanzada, aquí le pasaremos la ruta de la carpeta a Rust 
+        // para que Rust lea todos los PDFs adentro muy rápido. 
+        // Por ahora, solo lo mostramos en la lista como un "paquete".
+        const folderName = selectedFolder.split(/[\\/]/).pop();
+        const newFile = {
+          id: Math.random().toString(36).substr(2, 9),
+          name: `📁 Carpeta: ${folderName}`,
+          path: selectedFolder,
+          size: "Ruta de carpeta capturada"
+        };
+        setFiles(prev => [...prev, newFile]);
+      }
+    } catch (error) {
+      console.error("Error al abrir diálogo de carpeta:", error);
+    }
+  };
+
+  // ------------------------------------
 
   const tools = {
     merge: {
@@ -44,16 +101,13 @@ function App() {
     }
   };
 
-  // --- LÓGICA DE EVENTOS (Vanilla JS) ---
-
   const handleDragOver = (e) => {
-    e.preventDefault(); // Necesario para permitir el drop
+    e.preventDefault();
     setIsDragging(true);
   };
 
   const handleDragLeave = (e) => {
     e.preventDefault();
-    // Prevenimos parpadeos si el mouse pasa por encima de un texto interno
     if (!e.currentTarget.contains(e.relatedTarget)) {
       setIsDragging(false);
     }
@@ -62,14 +116,14 @@ function App() {
   const handleDrop = (e) => {
     e.preventDefault();
     setIsDragging(false);
-
-    // Extraemos los archivos del evento nativo
+    // Nota: A futuro cambiaremos este Drag&Drop para usar el evento nativo de Tauri 
+    // y obtener las rutas absolutas también al arrastrar.
     const droppedFiles = Array.from(e.dataTransfer.files).filter(file => file.type === "application/pdf" || file.name.endsWith(".pdf"));
 
-    // Los agregamos a la cola guardando su nombre y un id falso (luego Rust nos dará el Path real)
     const newFiles = droppedFiles.map(f => ({
       id: Math.random().toString(36).substr(2, 9),
       name: f.name,
+      path: "Arrastrado (Requiere Plugin nativo de Tauri)",
       size: (f.size / 1024 / 1024).toFixed(2) + " MB"
     }));
 
@@ -80,19 +134,18 @@ function App() {
     setFiles(files.filter(f => f.id !== id));
   };
 
-  // Simulación de procesamiento (Para probar el loader)
   const simulateProcess = () => {
     setIsProcessing(true);
     setTimeout(() => {
       setIsProcessing(false);
-      setFiles([]); // Limpiamos tras "procesar"
+      setFiles([]);
     }, 2000);
   };
 
   return (
     <div className="flex h-screen w-screen bg-neutral-900 text-neutral-200 overflow-hidden font-sans">
 
-      {/* SIDEBAR (Mantenemos igual) */}
+      {/* SIDEBAR */}
       <aside className="w-72 bg-neutral-950 border-r border-neutral-800 flex flex-col shadow-xl z-20 shrink-0">
         <div className="p-8">
           <h1 className="text-2xl font-black tracking-tighter text-white italic">LIL-PDF</h1>
@@ -103,10 +156,10 @@ function App() {
           {Object.entries(tools).map(([id, tool]) => (
             <button
               key={id}
-              onClick={() => { setActiveTool(id); setFiles([]); }} // Limpia archivos al cambiar de herramienta
+              onClick={() => { setActiveTool(id); setFiles([]); }}
               className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-200 group ${activeTool === id
-                ? "bg-neutral-800 text-white shadow-inner"
-                : "text-neutral-500 hover:bg-neutral-900 hover:text-neutral-300"
+                  ? "bg-neutral-800 text-white shadow-inner"
+                  : "text-neutral-500 hover:bg-neutral-900 hover:text-neutral-300"
                 }`}
             >
               <span className={`${activeTool === id ? "text-white" : "text-neutral-600 group-hover:text-neutral-400"}`}>
@@ -125,7 +178,7 @@ function App() {
         </div>
       </aside>
 
-      {/* MAIN CONTENT - Ahora con scroll dinámico */}
+      {/* MAIN CONTENT */}
       <main
         className="flex-1 flex flex-col relative overflow-y-auto"
         onDragEnter={handleDragOver}
@@ -134,7 +187,6 @@ function App() {
         onDrop={handleDrop}
       >
 
-        {/* OVERLAY DE ARRASTRE (Aparece solo cuando el mouse arrastra un archivo) */}
         {isDragging && (
           <div className="absolute inset-0 z-50 bg-neutral-900/90 backdrop-blur-sm border-4 border-dashed border-white/50 rounded-lg m-4 flex flex-col items-center justify-center transition-all">
             <svg className="w-24 h-24 text-white mb-4 animate-bounce" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="1">
@@ -168,7 +220,7 @@ function App() {
             </div>
           </header>
 
-          {/* VISTA 1: DROPZONE GIGANTE (Si no hay archivos cargados) */}
+          {/* VISTA 1: DROPZONE GIGANTE */}
           {files.length === 0 && (
             <div className="flex-1 border-2 border-dashed border-neutral-800 rounded-[2.5rem] flex flex-col items-center justify-center bg-neutral-900/50 hover:border-neutral-600 transition-all duration-300 group min-h-[300px]">
               <div className="text-center p-8 pointer-events-none">
@@ -184,28 +236,40 @@ function App() {
                 </p>
               </div>
 
-              {/* Botones Manuales */}
               <div className="mt-4 flex gap-3 justify-center z-10">
-                <button className="bg-white text-black px-6 py-2.5 rounded-xl font-bold hover:bg-neutral-200 transition-all active:scale-95 shadow-lg text-sm">
+                {/* BOTÓN CONECTADO A RUST */}
+                <button
+                  onClick={handleSelectFiles}
+                  className="bg-white text-black px-6 py-2.5 rounded-xl font-bold hover:bg-neutral-200 transition-all active:scale-95 shadow-lg text-sm"
+                >
                   Seleccionar Archivos
+                </button>
+                {/* BOTÓN PARA CARPETAS */}
+                <button
+                  onClick={handleSelectFolder}
+                  className="bg-neutral-800 text-white px-6 py-2.5 rounded-xl font-bold hover:bg-neutral-700 transition-all active:scale-95 border border-neutral-700 text-sm"
+                >
+                  Cargar Carpeta
                 </button>
               </div>
             </div>
           )}
 
-          {/* VISTA 2: LISTA DE ARCHIVOS (Si ya cargaron algo) */}
+          {/* VISTA 2: LISTA DE ARCHIVOS */}
           {files.length > 0 && (
             <div className="flex-1 flex flex-col animate-in fade-in slide-in-from-bottom-4 duration-500">
               <div className="flex justify-between items-center mb-4">
                 <h3 className="text-lg font-bold text-white">Archivos en cola ({files.length})</h3>
-                <button className="text-sm font-medium text-neutral-400 hover:text-white transition-colors border border-neutral-700 px-3 py-1.5 rounded-lg hover:bg-neutral-800">
+                <button
+                  onClick={handleSelectFiles} // Conectado al plugin también
+                  className="text-sm font-medium text-neutral-400 hover:text-white transition-colors border border-neutral-700 px-3 py-1.5 rounded-lg hover:bg-neutral-800"
+                >
                   + Agregar más archivos
                 </button>
               </div>
 
-              {/* Lista escroleable */}
               <div className="flex-1 overflow-y-auto space-y-2 pr-2">
-                {files.map((file, index) => (
+                {files.map((file) => (
                   <div key={file.id} className="flex items-center justify-between p-4 bg-neutral-800/50 border border-neutral-700/50 rounded-xl hover:bg-neutral-800 transition-colors">
                     <div className="flex items-center gap-3 overflow-hidden">
                       <div className="p-2 bg-neutral-900 rounded-lg text-red-500 shrink-0">
@@ -215,7 +279,8 @@ function App() {
                       </div>
                       <div className="truncate">
                         <p className="text-sm font-medium text-white truncate">{file.name}</p>
-                        <p className="text-xs text-neutral-500">{file.size}</p>
+                        {/* AHORA MOSTRAMOS LA RUTA REAL PARA COMPROBAR QUE FUNCIONA */}
+                        <p className="text-xs text-neutral-500 truncate" title={file.path}>{file.path}</p>
                       </div>
                     </div>
                     <button
@@ -230,19 +295,17 @@ function App() {
                 ))}
               </div>
 
-              {/* Botón de Acción Principal (El que llamará a Rust) */}
               <div className="mt-6 pt-6 border-t border-neutral-800 shrink-0">
                 <button
                   onClick={simulateProcess}
                   disabled={isProcessing}
                   className={`w-full py-4 rounded-xl font-bold text-lg transition-all flex items-center justify-center gap-3 ${isProcessing
-                    ? "bg-neutral-800 text-neutral-500 cursor-not-allowed border border-neutral-700"
-                    : "bg-white text-black hover:bg-neutral-200 active:scale-[0.98] shadow-xl"
+                      ? "bg-neutral-800 text-neutral-500 cursor-not-allowed border border-neutral-700"
+                      : "bg-white text-black hover:bg-neutral-200 active:scale-[0.98] shadow-xl"
                     }`}
                 >
                   {isProcessing ? (
                     <>
-                      {/* Spinner Ultra Ligero SVG */}
                       <svg className="animate-spin h-5 w-5 text-neutral-500" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
                         <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
                         <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
